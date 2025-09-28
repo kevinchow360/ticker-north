@@ -1,17 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>TICKER-NORTH</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <title>TICKER-NORTH Calculator</title>
 </head>
 <body>
-    <h1>TICKER-NORTH: Stock Metrics</h1>
-    <input type="text" id="ticker" placeholder="Enter ticker">
-    <button onclick="getMetrics()">Get Metrics</button>
+  <h1>TICKER-NORTH: Stock Metrics</h1>
+  <form action="/calculate" method="get">
+    <label for="ticker">Enter Ticker:</label>
+    <input type="text" id="ticker" name="ticker" required>
+    <button type="submit">Calculate</button>
+  </form>
 
-    <pre id="results"></pre>
+  {% if result %}
+    <h2>Results for {{ result.ticker }}</h2>
+    <ul>
+      <li>Average Annual Return: {{ result.average_annual_return }}%</li>
+      <li>Volatility: {{ result.volatility }}%</li>
+      <li>Max Drawdown: {{ result.max_drawdown }}%</li>
+      <li>Sharpe Ratio: {{ result.sharpe_ratio }}</li>
+    </ul>
+  {% endif %}
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  {% if error %}
+    <p style="color:red;">Error: {{ error }}</p>
+  {% endif %}
 </body>
 </html>

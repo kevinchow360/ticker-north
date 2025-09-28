@@ -1,4 +1,6 @@
-flask
+fastapi
+uvicorn[standard]
 yfinance
-numpy
 pandas
+numpy
+jinja2
