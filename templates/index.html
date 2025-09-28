@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TICKER-NORTH</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>TICKER-NORTH: Stock Metrics</h1>
+    <input type="text" id="ticker" placeholder="Enter ticker">
+    <button onclick="getMetrics()">Get Metrics</button>
+
+    <pre id="results"></pre>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

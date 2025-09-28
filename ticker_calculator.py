@@ -1,5 +1,9 @@
+from flask import Flask, jsonify, render_template, request
 import yfinance as yf
+import pandas as pd
 import numpy as np
+import os
+
 
 def calculate_metrics(ticker_symbol):
     data = yf.download(ticker_symbol, period="5y", interval="1d", progress=False, auto_adjust=True)
@@ -31,3 +35,13 @@ if __name__ == "__main__":
     ticker = input("Enter ticker: ")
     metrics = calculate_metrics(ticker)
     print(metrics)
+
+@app.route("/")
+def home():
+    # Serve your HTML front-end
+    return render_template("index.html")
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
