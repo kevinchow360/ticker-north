@@ -10,7 +10,7 @@ app = FastAPI(title="TICKER-NORTH API")
 origins = [
     "https://tickernorth.com",               # your main website
     "https://www.tickernorth.com",
-    "https://sitebuilder1.web-hosting.com"  # add your Namecheap builder domain here
+    "https://sitebuilder1.web-hosting.com/fQ8ky/"  # add your Namecheap builder domain here
 ]
 
 app.add_middleware(
