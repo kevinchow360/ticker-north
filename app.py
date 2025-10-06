@@ -1,7 +1,15 @@
 from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
 import yfinance as yf
 import numpy as np
 import pandas as pd
+
+
+CORS(app, origins=[
+    "https://tickernorth.com",
+    "https://www.tickernorth.com",
+    "https://sitebuilder1.web-hosting.com"
+])
 
 app = Flask(__name__)
 
