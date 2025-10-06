@@ -61,7 +61,38 @@ def calculate_metrics(ticker_symbol):
         raise HTTPException(status_code=400, detail=str(e))
 
 # --- API endpoint ---
-@app.get("/api/ticker/{ticker_symbol}")
-def get_ticker_metrics(ticker_symbol: str):
-    return calculate_metrics(ticker_symbol)
+
+from fastapi.responses import HTMLResponse
+
+@app.get("/ticker-page/{ticker_symbol}", response_class=HTMLResponse)
+def ticker_page(ticker_symbol: str):
+    data = calculate_metrics(ticker_symbol)
+    table_html = "<table><tr><th>Metric</th><th>Value</th></tr>"
+    for key, value in data.items():
+        if key == "ticker":
+            continue
+        cls = "positive" if value >= 0 and key != "max_drawdown" else "negative"
+        table_html += f"<tr><td>{key.replace('_',' ').title()}</td><td class='{cls}'>{value}</td></tr>"
+    table_html += "</table>"
+
+    html = f"""
+    <html>
+    <head>
+    <title>Metrics for {data['ticker']}</title>
+    <style>
+        body {{ font-family: Arial; margin: 40px; }}
+        table {{ border-collapse: collapse; width: 60%; }}
+        th, td {{ border: 1px solid #ccc; padding: 8px; text-align: center; }}
+        th {{ background-color: #f2f2f2; }}
+        .positive {{ color: green; font-weight: bold; }}
+        .negative {{ color: red; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+        <h2>Metrics for {data['ticker']}</h2>
+        {table_html}
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
 
