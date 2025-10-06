@@ -1,9 +1,9 @@
-from flask import Flask, request, render_template_string
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 import yfinance as yf
 import numpy as np
-import os
 
-app = Flask(__name__)
+app = FastAPI(title="TICKER-NORTH API")
 
 def calculate_metrics(ticker_symbol):
     try:
@@ -22,63 +22,63 @@ def calculate_metrics(ticker_symbol):
         max_drawdown = (cum_returns / cum_returns.cummax() - 1).min()
         sharpe_ratio = avg_return / volatility if volatility != 0 else 0
 
+        # Additional Basic Metrics
+        sortino_ratio = avg_return / data['Returns'][data['Returns'] < 0].std() if len(data['Returns'][data['Returns'] < 0]) > 1 else 0
+        win_rate = (data['Returns'] > 0).sum() / len(data['Returns']) * 100
+        rolling_3m = data['Returns'].rolling(window=63).sum().mean() * 100  # approx 3 months
+        rolling_6m = data['Returns'].rolling(window=126).sum().mean() * 100  # approx 6 months
+        rolling_1y = data['Returns'].rolling(window=252).sum().mean() * 100  # approx 1 year
+
         return {
             "ticker": ticker_symbol.upper(),
             "average_annual_return": round(avg_return * 100, 2),
             "volatility": round(volatility * 100, 2),
             "max_drawdown": round(max_drawdown * 100, 2),
-            "sharpe_ratio": round(sharpe_ratio, 2)
+            "sharpe_ratio": round(sharpe_ratio, 2),
+            "sortino_ratio": round(sortino_ratio, 2),
+            "win_rate": round(win_rate, 2),
+            "rolling_3m": round(rolling_3m, 2),
+            "rolling_6m": round(rolling_6m, 2),
+            "rolling_1y": round(rolling_1y, 2)
         }
 
     except Exception as e:
         return {"error": f"Unexpected error: {e}"}
 
-# HTML template to display results in a table
-HTML_PAGE = """
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>TICKER-NORTH Results for {{ result['ticker'] if result else '' }}</title>
-<style>
-    body { font-family: Arial, sans-serif; margin: 40px; background-color: #f8f9fa; }
-    h2 { color: #333; }
-    table { border-collapse: collapse; width: 50%; margin-top: 20px;}
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center;}
-    th { background-color: #f2f2f2; }
-    .positive { color: green; font-weight: bold; }
-    .negative { color: red; font-weight: bold; }
-    .error { color: red; font-weight: bold; margin-top: 20px; }
-</style>
-</head>
-<body>
-<h2>TICKER-NORTH Results</h2>
+@app.get("/api/ticker/{ticker_symbol}", response_class=HTMLResponse)
+def get_ticker_table(ticker_symbol: str):
+    result = calculate_metrics(ticker_symbol)
+    if "error" in result:
+        return f"<h3 style='color:red'>{result['error']}</h3>"
 
-{% if result %}
-    {% if result.error %}
-        <div class="error">{{ result.error }}</div>
-    {% else %}
+    html = f"""
+    <html>
+    <head>
+        <title>TICKER-NORTH Metrics for {result['ticker']}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }}
+            table {{ border-collapse: collapse; width: 70%; margin-top: 20px; }}
+            th, td {{ border: 1px solid #ccc; padding: 10px; text-align: center; }}
+            th {{ background-color: #f2f2f2; }}
+            .positive {{ color: green; font-weight: bold; }}
+            .negative {{ color: red; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <h2>Metrics for {result['ticker']}</h2>
         <table>
             <tr><th>Metric</th><th>Value</th></tr>
-            <tr><td>Average Annual Return</td><td class="{{ 'positive' if result['average_annual_return']>=0 else 'negative' }}">{{ result['average_annual_return'] }}%</td></tr>
-            <tr><td>Volatility</td><td>{{ result['volatility'] }}%</td></tr>
-            <tr><td>Max Drawdown</td><td class="{{ 'negative' if result['max_drawdown']<0 else 'positive' }}">{{ result['max_drawdown'] }}%</td></tr>
-            <tr><td>Sharpe Ratio</td><td>{{ result['sharpe_ratio'] }}</td></tr>
+            <tr><td>Average Annual Return</td><td class='{"positive" if result["average_annual_return"]>=0 else "negative"}'>{result["average_annual_return"]}%</td></tr>
+            <tr><td>Volatility</td><td>{result["volatility"]}%</td></tr>
+            <tr><td>Max Drawdown</td><td class='{"negative" if result["max_drawdown"]<0 else "positive"}'>{result["max_drawdown"]}%</td></tr>
+            <tr><td>Sharpe Ratio</td><td>{result["sharpe_ratio"]}</td></tr>
+            <tr><td>Sortino Ratio</td><td>{result["sortino_ratio"]}</td></tr>
+            <tr><td>Win Rate</td><td>{result["win_rate"]}%</td></tr>
+            <tr><td>Rolling 3M</td><td>{result["rolling_3m"]}%</td></tr>
+            <tr><td>Rolling 6M</td><td>{result["rolling_6m"]}%</td></tr>
+            <tr><td>Rolling 1Y</td><td>{result["rolling_1y"]}%</td></tr>
         </table>
-    {% endif %}
-{% else %}
-    <p>Please enter a ticker in the URL, e.g., /api/ticker/AAPL</p>
-{% endif %}
-
-</body>
-</html>
-"""
-
-@app.route("/api/ticker/<ticker_symbol>")
-def ticker_page(ticker_symbol):
-    result = calculate_metrics(ticker_symbol)
-    return render_template_string(HTML_PAGE, result=result)
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    </body>
+    </html>
+    """
+    return html
