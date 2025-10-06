@@ -4,6 +4,7 @@ import yfinance as yf
 import numpy as np
 import pandas as pd
 
+app = Flask(__name__)
 
 CORS(app, origins=[
     "https://tickernorth.com",
@@ -11,7 +12,6 @@ CORS(app, origins=[
     "https://sitebuilder1.web-hosting.com"
 ])
 
-app = Flask(__name__)
 
 # You can paste the same calc_* functions here as above (CAGR, Sortino, etc.)
 
