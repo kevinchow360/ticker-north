@@ -6,11 +6,11 @@ import numpy as np
 
 app = FastAPI(title="TICKER-NORTH API")
 
-# Allow CORS from your Namecheap site
+# CORS for your website
 origins = [
     "https://tickernorth.com",
     "https://www.tickernorth.com",
-    "https://sitebuilder1.web-hosting.com"
+    "https://sitebuilder1.web-hosting.com/fQ8ky/"
 ]
 
 app.add_middleware(
@@ -21,95 +21,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Helper functions for Basic metrics ---
-def calc_cagr(data):
-    start_price = data['Adj Close'].iloc[0]
-    end_price = data['Adj Close'].iloc[-1]
-    years = (data.index[-1] - data.index[0]).days / 365
-    return (end_price / start_price) ** (1 / years) - 1
-
-def calc_sortino(returns):
-    avg_return = returns.mean() * 252
-    downside = returns[returns < 0].std() * np.sqrt(252)
-    return avg_return / downside if downside != 0 else 0
-
-def calc_rolling_returns(data):
-    price = data['Adj Close']
-    returns = {}
-    for label, days in [("3M", 63), ("6M", 126), ("1Y", 252)]:
-        if len(price) > days:
-            returns[label] = (price.iloc[-1] / price.iloc[-days] - 1) * 100
-    return returns
-
-def calc_win_rate(returns):
-    return (returns > 0).sum() / len(returns) * 100
-
-def calc_max_consecutive(returns):
-    gains = losses = max_gains = max_losses = 0
-    for r in returns:
-        if r > 0:
-            gains += 1
-            losses = 0
-        elif r < 0:
-            losses += 1
-            gains = 0
-        max_gains = max(max_gains, gains)
-        max_losses = max(max_losses, losses)
-    return {"max_gains": max_gains, "max_losses": max_losses}
-
-def calc_beta_vs_spy(data):
-    spy = yf.download("SPY", start=data.index[0], end=data.index[-1], interval="1d", progress=False)
-    if spy.empty:
-        return None
-    stock_ret = data['Adj Close'].pct_change().dropna()
-    spy_ret = spy['Adj Close'].pct_change().dropna()
-    df = pd.concat([stock_ret, spy_ret], axis=1).dropna()
-    df.columns = ['stock', 'spy']
-    cov = np.cov(df['stock'], df['spy'])[0, 1]
-    var = np.var(df['spy'])
-    return cov / var if var != 0 else None
-
-# --- Core metrics ---
-def calculate_metrics(ticker_symbol, tier="free"):
+def calculate_metrics(ticker_symbol):
     try:
-        data = yf.download(ticker_symbol, period="5y", interval="1d", progress=False)
-        if data.empty or 'Adj Close' not in data.columns:
-            raise ValueError("No data found or 'Adj Close' not available")
+        data = yf.download(ticker_symbol, period="5y", interval="1d", progress=False, auto_adjust=True)
+        if data.empty:
+            raise ValueError(f"No data found for ticker '{ticker_symbol}'")
 
-        data['Returns'] = data['Adj Close'].pct_change().dropna()
+        price_col = 'Adj Close' if 'Adj Close' in data.columns else 'Close'
+        data['Returns'] = data[price_col].pct_change().dropna()
+        if len(data['Returns']) < 2:
+            raise ValueError(f"Not enough data for '{ticker_symbol}'")
 
-        # Free metrics
+        # Free-tier metrics
         avg_return = data['Returns'].mean() * 252
         volatility = data['Returns'].std() * np.sqrt(252)
         cum_returns = (1 + data['Returns']).cumprod()
         max_drawdown = (cum_returns / cum_returns.cummax() - 1).min()
         sharpe_ratio = avg_return / volatility if volatility != 0 else 0
 
-        result = {
-            "tier": tier,
-            "ticker": ticker_symbol.upper(),
+        free_metrics = {
             "average_annual_return": round(avg_return * 100, 2),
             "volatility": round(volatility * 100, 2),
             "max_drawdown": round(max_drawdown * 100, 2),
             "sharpe_ratio": round(sharpe_ratio, 2)
         }
 
-        # Add Basic metrics if requested
-        if tier == "basic":
-            result.update({
-                "cagr": round(calc_cagr(data) * 100, 2),
-                "sortino_ratio": round(calc_sortino(data['Returns']), 2),
-                "rolling_returns": calc_rolling_returns(data),
-                "win_rate": round(calc_win_rate(data['Returns']), 2),
-                "max_consecutive": calc_max_consecutive(data['Returns']),
-                "beta_vs_spy": round(calc_beta_vs_spy(data), 3)
-            })
+        # Basic-tier metrics
+        cagr = (cum_returns.iloc[-1])**(1/5) - 1  # 5-year CAGR
+        sortino_ratio = (avg_return / (data['Returns'][data['Returns'] < 0].std() * np.sqrt(252))
+                         if any(data['Returns'] < 0) else 0)
+        rolling_3m = data['Returns'].rolling(63).apply(lambda x: (1 + x).prod() - 1).iloc[-1]  # ~63 trading days
+        rolling_6m = data['Returns'].rolling(126).apply(lambda x: (1 + x).prod() - 1).iloc[-1]
+        rolling_1y = data['Returns'].rolling(252).apply(lambda x: (1 + x).prod() - 1).iloc[-1]
+        win_rate = (data['Returns'] > 0).sum() / len(data['Returns'])
+        max_consec_gain = max((sum(1 for _ in g) for k, g in __import__('itertools').groupby(data['Returns'] > 0) if k), default=0)
+        max_consec_loss = max((sum(1 for _ in g) for k, g in __import__('itertools').groupby(data['Returns'] < 0) if k), default=0)
+        # Beta vs SPY example
+        spy = yf.download('SPY', period="5y", interval="1d", progress=False, auto_adjust=True)['Adj Close'].pct_change().dropna()
+        beta = np.cov(data['Returns'].iloc[-len(spy):], spy)[0,1] / np.var(spy) if len(spy) > 1 else 0
 
-        return result
+        basic_metrics = {
+            "CAGR": round(cagr * 100, 2),
+            "Sortino_ratio": round(sortino_ratio, 2),
+            "Rolling_returns_3M": round(rolling_3m * 100, 2),
+            "Rolling_returns_6M": round(rolling_6m * 100, 2),
+            "Rolling_returns_1Y": round(rolling_1y * 100, 2),
+            "Win_rate": round(win_rate * 100, 2),
+            "Max_consecutive_gains": max_consec_gain,
+            "Max_consecutive_losses": max_consec_loss,
+            "Beta_vs_SPY": round(beta, 2)
+        }
+
+        return {
+            "ticker": ticker_symbol.upper(),
+            "free_metrics": free_metrics,
+            "basic_metrics": basic_metrics
+        }
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/ticker/{ticker_symbol}")
-def get_ticker_metrics(ticker_symbol: str, tier: str = "free"):
-    return calculate_metrics(ticker_symbol, tier)
+def get_ticker_metrics(ticker_symbol: str):
+    return calculate_metrics(ticker_symbol)
