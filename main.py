@@ -10,7 +10,7 @@ app = FastAPI(title="TICKER-NORTH API")
 origins = [
     "https://tickernorth.com",
     "https://www.tickernorth.com",
-    "https://sitebuilder1.web-hosting.com/fQ8ky/"
+    "https://sitebuilder1.web-hosting.com"
 ]
 
 app.add_middleware(
