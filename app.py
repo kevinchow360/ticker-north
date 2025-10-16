@@ -117,7 +117,11 @@ def api_ticker(ticker_symbol):
     return jsonify(calculate_metrics(ticker_symbol))
 
 # --- Avexineer Script Generator ---
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable not set!")
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 @app.route("/generate", methods=["GET", "POST"])
 def generate_script():
