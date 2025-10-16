@@ -4,6 +4,8 @@ import yfinance as yf
 import numpy as np
 import pandas as pd
 import logging
+import os
+from openai import OpenAI
 
 app = Flask(__name__)
 
@@ -34,19 +36,16 @@ def calculate_metrics(ticker_symbol):
         max_drawdown = (cum_returns / cum_returns.cummax() - 1).min()
         sharpe_ratio = avg_return / volatility if volatility != 0 else 0
 
-        # Basic tier metrics
-        sortino_ratio = 0  # placeholder; implement if needed
+        sortino_ratio = 0  # placeholder
         win_rate = (data['Returns'] > 0).mean()
-        rolling_3m = data['Returns'].rolling(63).sum().iloc[-1] * 100  # ~63 trading days per 3 months
+        rolling_3m = data['Returns'].rolling(63).sum().iloc[-1] * 100
 
         return {
             "ticker": ticker_symbol.upper(),
-            # Free tier
             "average_annual_return": round(avg_return * 100, 2),
             "volatility": round(volatility * 100, 2),
             "max_drawdown": round(max_drawdown * 100, 2),
             "sharpe_ratio": round(sharpe_ratio, 2),
-            # Basic tier
             "sortino_ratio": round(sortino_ratio, 2),
             "win_rate": round(win_rate * 100, 2),
             "rolling_3m": round(rolling_3m, 2)
@@ -56,7 +55,7 @@ def calculate_metrics(ticker_symbol):
         logging.error(f"Error fetching metrics for {ticker_symbol}: {e}")
         return {"error": f"Unexpected error: {e}"}
 
-# --- HTML Template ---
+# --- HTML PAGE ---
 HTML_PAGE = """
 <!doctype html>
 <html lang="en">
@@ -68,7 +67,7 @@ HTML_PAGE = """
     input[type=text] { padding: 8px 12px; width: 200px; border-radius: 5px; border: 1px solid #ccc; }
     button { padding: 8px 16px; border-radius: 5px; background-color: #5b9cf6; color: #fff; border: none; cursor: pointer; }
     button:hover { background-color: #4a8de0; }
-    table { border-collapse: collapse; margin-top: 20px; width: 60%; }
+    table { border-collapse: collapse; margin-top: 20px; width: 60%; max-width: 600px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background-color: #eee; }
     .positive { color: green; font-weight: bold; }
@@ -117,22 +116,12 @@ def index():
 def api_ticker(ticker_symbol):
     return jsonify(calculate_metrics(ticker_symbol))
 
-# --- Run ---
-import os
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
-
-import os
-from openai import OpenAI
-from flask import Flask, request, jsonify, render_template_string
-
+# --- Avexineer Script Generator ---
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 @app.route("/generate", methods=["GET", "POST"])
 def generate_script():
     if request.method == "GET":
-        # Show the HTML form
         return render_template_string("""
         <!DOCTYPE html>
         <html lang="en">
@@ -145,7 +134,6 @@ def generate_script():
                 textarea, input[type=text] { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
                 button { margin-top: 10px; padding: 10px 15px; background: #5b9cf6; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
                 button:hover { background: #4a8de0; }
-                pre { background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; margin-top: 15px; }
             </style>
         </head>
         <body>
@@ -161,32 +149,52 @@ def generate_script():
         </html>
         """)
 
-    # POST request — generate code
     user_input = request.form.get("description", "").strip()
     if not user_input:
         return "<p>Please describe the script you want.</p>"
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are an expert Pine Script v5 developer."},
-                {"role": "user", "content": f"Write a complete TradingView Pine Script v5 code for: {user_input}"}
-            ],
-            temperature=0.4,
-        )
-        pine_code = response.choices[0].message.content
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are an expert Pine Script v5 developer."},
+            {"role": "user", "content": f"Write a complete TradingView Pine Script v5 code for: {user_input}"}
+        ],
+        temperature=0.4,
+    )
+    pine_code = response.choices[0].message.content
 
-        return render_template_string(f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Generated Pine Script</title>
-            <style>
-                body {{ font-family: monospace; background: #f8f9fa; padding: 30px; }}
-                .container {{ max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
-                pre {{ background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; }}
-                button {{ margin-top: 10px; padding: 10px 15px; background: #5b9cf6; color: #fff; border: none; border-radius: 5
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Generated Pine Script</title>
+        <style>
+            body { font-family: monospace; background: #f8f9fa; padding: 30px; }
+            .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            pre { background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; }
+            button { margin-top: 10px; padding: 10px 15px; background: #5b9cf6; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Generated Pine Script</h2>
+            <pre id="code">{{ code }}</pre>
+            <button onclick="copyCode()">Copy to Clipboard</button>
+        </div>
+        <script>
+            function copyCode() {
+                const code = document.getElementById('code').innerText;
+                navigator.clipboard.writeText(code);
+                alert('Copied!');
+            }
+        </script>
+    </body>
+    </html>
+    """, code=pine_code)
 
+# --- Run ---
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
 
