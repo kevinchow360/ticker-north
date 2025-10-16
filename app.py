@@ -123,3 +123,70 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
 
+import os
+from openai import OpenAI
+from flask import Flask, request, jsonify, render_template_string
+
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+@app.route("/generate", methods=["GET", "POST"])
+def generate_script():
+    if request.method == "GET":
+        # Show the HTML form
+        return render_template_string("""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Avexineer - Pine Script Generator</title>
+            <style>
+                body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 30px; }
+                .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+                textarea, input[type=text] { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+                button { margin-top: 10px; padding: 10px 15px; background: #5b9cf6; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+                button:hover { background: #4a8de0; }
+                pre { background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; margin-top: 15px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2>Avexineer 🧠 — Pine Script Generator</h2>
+                <form method="POST">
+                    <label for="description">What kind of script do you want?</label>
+                    <textarea id="description" name="description" rows="4" placeholder="e.g., A Keltner Channel breakout strategy with alerts..."></textarea>
+                    <button type="submit">Generate Script</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        """)
+
+    # POST request — generate code
+    user_input = request.form.get("description", "").strip()
+    if not user_input:
+        return "<p>Please describe the script you want.</p>"
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert Pine Script v5 developer."},
+                {"role": "user", "content": f"Write a complete TradingView Pine Script v5 code for: {user_input}"}
+            ],
+            temperature=0.4,
+        )
+        pine_code = response.choices[0].message.content
+
+        return render_template_string(f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Generated Pine Script</title>
+            <style>
+                body {{ font-family: monospace; background: #f8f9fa; padding: 30px; }}
+                .container {{ max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+                pre {{ background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; }}
+                button {{ margin-top: 10px; padding: 10px 15px; background: #5b9cf6; color: #fff; border: none; border-radius: 5
+
+
